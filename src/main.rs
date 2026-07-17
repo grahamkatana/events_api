@@ -7,6 +7,21 @@ use std::sync::{Arc, Mutex};
 
 #[tokio::main]
 async fn main() {
+    // Load variables from .env into the environment.
+    dotenvy::dotenv().ok();
+
+    let database_url = std::env::var("DATABASE_URL")
+        .expect("DATABASE_URL must be set in .env");
+
+    let pool = sqlx::postgres::PgPoolOptions::new()
+        .max_connections(5)
+        .connect(&database_url)
+        .await
+        .expect("Failed to connect to Postgres");
+
+    println!("✅ Connected to Postgres!");
+    drop(pool);
+
     let initial_state = AppState {
         events: vec![
             Event { id: 1, name: String::from("Rust Meetup") },

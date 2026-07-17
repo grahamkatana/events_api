@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: events_api_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: events_user
+      POSTGRES_PASSWORD: events_password
+      POSTGRES_DB: events_db
+    ports:
+      # host_port:container_port — Postgres normally uses 5432,
+      # we're mapping it to 5455 on your machine on purpose,
+      # so it's clearly "our experiment's" Postgres, not the default one.
+      - "5455:5432"
+    volumes:
+      # Persists database data on your machine, so data survives
+      # `docker compose down` / container restarts.
+      - events_pg_data:/var/lib/postgresql/data
+
+  adminer:
+    image: adminer:latest
+    container_name: events_api_adminer
+    restart: unless-stopped
+    ports:
+      - "8081:8080"
+    depends_on:
+      - postgres
+
+volumes:
+  events_pg_data:
