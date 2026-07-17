@@ -1,2 +1,18 @@
-###
-GET http://localhost:3000/
+@baseUrl = http://localhost:3000
+
+### List all events
+GET {{baseUrl}}/events
+
+### Get a single event by id
+GET {{baseUrl}}/events/1
+
+### Get a non-existent event (should 404)
+GET {{baseUrl}}/events/99
+
+### Create a new event
+POST {{baseUrl}}/events
+Content-Type: application/json
+
+{
+  "name": "Poetry Slam"
+}
