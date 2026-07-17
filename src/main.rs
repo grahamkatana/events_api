@@ -126,10 +126,9 @@
 //     }
 // }
 
-
 use axum::{
     extract::{Path, State},
-    routing::{get, post},
+    routing::get,
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
@@ -141,10 +140,13 @@ struct Event {
     name: String,
 }
 
-// A separate struct for incoming data — notice it has no `id`.
-// The client shouldn't get to pick the ID; we assign it ourselves.
 #[derive(Deserialize)]
 struct CreateEvent {
+    name: String,
+}
+
+#[derive(Deserialize)]
+struct UpdateEvent {
     name: String,
 }
 
@@ -169,7 +171,10 @@ async fn main() {
 
     let app = Router::new()
         .route("/events", get(list_events).post(create_event))
-        .route("/events/{id}", get(get_event))
+        .route(
+            "/events/{id}",
+            get(get_event).put(update_event).delete(delete_event),
+        )
         .with_state(shared);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -205,4 +210,34 @@ async fn create_event(
     state.events.push(new_event.clone());
     state.next_id += 1;
     Json(new_event)
+}
+
+async fn update_event(
+    State(state): State<SharedState>,
+    Path(id): Path<u32>,
+    Json(payload): Json<UpdateEvent>,
+) -> Result<Json<Event>, axum::http::StatusCode> {
+    let mut state = state.lock().unwrap();
+    match state.events.iter_mut().find(|e| e.id == id) {
+        Some(event) => {
+            event.name = payload.name;
+            Ok(Json(event.clone()))
+        }
+        None => Err(axum::http::StatusCode::NOT_FOUND),
+    }
+}
+
+async fn delete_event(
+    State(state): State<SharedState>,
+    Path(id): Path<u32>,
+) -> axum::http::StatusCode {
+    let mut state = state.lock().unwrap();
+    let original_len = state.events.len();
+    state.events.retain(|e| e.id != id);
+
+    if state.events.len() < original_len {
+        axum::http::StatusCode::NO_CONTENT
+    } else {
+        axum::http::StatusCode::NOT_FOUND
+    }
 }

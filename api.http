@@ -16,3 +16,18 @@ Content-Type: application/json
 {
   "name": "Poetry Slam"
 }
+
+
+### Update an event
+PUT {{baseUrl}}/events/1
+Content-Type: application/json
+
+{
+  "name": "Rust Meetup (Updated)"
+}
+
+### Delete an event
+DELETE {{baseUrl}}/events/2
+
+### Confirm it's gone
+GET {{baseUrl}}/events
