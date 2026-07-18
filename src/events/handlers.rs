@@ -52,42 +52,66 @@ pub async fn create_event(
     Ok(Json(event))
 }
 
+// Shared by update_event and delete_event: load the event, and make
+// sure the requesting user is actually its owner before proceeding.
+async fn require_ownership(
+    state: &SharedState,
+    id: i32,
+    user_id: i32,
+) -> Result<(), StatusCode> {
+    let existing = sqlx::query_as::<_, Event>(
+        "SELECT id, name, created_at, user_id FROM events WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_optional(&state.db)
+    .await
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+    .ok_or(StatusCode::NOT_FOUND)?;
+
+    // `existing.user_id` is `Option<i32>` — this is `None` for legacy
+    // events created before we added ownership. `None != Some(x)` is
+    // always true, so nobody can currently edit an ownerless event
+    // through this check. That's a deliberate, safe default for now.
+    if existing.user_id != Some(user_id) {
+        return Err(StatusCode::FORBIDDEN);
+    }
+
+    Ok(())
+}
+
 pub async fn update_event(
     State(state): State<SharedState>,
-    _user: AuthUser,
+    user: AuthUser,
     Path(id): Path<i32>,
     Json(payload): Json<UpdateEvent>,
 ) -> Result<Json<Event>, StatusCode> {
+    require_ownership(&state, id, user.user_id).await?;
+
     let event = sqlx::query_as::<_, Event>(
         "UPDATE events SET name = $1 WHERE id = $2
          RETURNING id, name, created_at, user_id",
     )
     .bind(payload.name)
     .bind(id)
-    .fetch_optional(&state.db)
+    .fetch_one(&state.db)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    match event {
-        Some(event) => Ok(Json(event)),
-        None => Err(StatusCode::NOT_FOUND),
-    }
+    Ok(Json(event))
 }
 
 pub async fn delete_event(
     State(state): State<SharedState>,
-    _user: AuthUser,
+    user: AuthUser,
     Path(id): Path<i32>,
 ) -> Result<StatusCode, StatusCode> {
-    let result = sqlx::query("DELETE FROM events WHERE id = $1")
+    require_ownership(&state, id, user.user_id).await?;
+
+    sqlx::query("DELETE FROM events WHERE id = $1")
         .bind(id)
         .execute(&state.db)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
-    if result.rows_affected() > 0 {
-        Ok(StatusCode::NO_CONTENT)
-    } else {
-        Ok(StatusCode::NOT_FOUND)
-    }
+    Ok(StatusCode::NO_CONTENT)
 }
