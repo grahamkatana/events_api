@@ -1,4 +1,7 @@
-use super::models::{Claims, LoginUser, RegisterUser, TokenResponse, User, VerifyEmailQuery};
+use super::models::{
+    Claims, LoginUser, MessageResponse, RegisterUser, ResendVerification, TokenResponse, User,
+    VerifyEmailQuery,
+};
 use crate::common::state::SharedState;
 use argon2::{
     password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
@@ -10,18 +13,31 @@ use axum::{
     response::Html,
     Json,
 };
-use chrono::{Duration, Utc};
+use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{encode, EncodingKey, Header};
 use rand_core::OsRng;
 use uuid::Uuid;
 
-const USER_COLUMNS: &str = "id, email, password_hash, email_verified_at, created_at";
+const USER_COLUMNS: &str =
+    "id, email, password_hash, email_verified_at, last_verification_sent_at, created_at";
 
-// Loaded from disk into the compiled binary at COMPILE TIME — not read
-// from the filesystem while the server is running. If this file is
-// missing when you build, compilation fails immediately, not at 2am
-// when someone finally registers in production.
 const VERIFY_EMAIL_TEMPLATE: &str = include_str!("../../templates/verify_email.html");
+
+// How long a user must wait between requesting new verification emails.
+const RESEND_COOLDOWN: Duration = Duration::seconds(60);
+
+// Shared by `register` and `resend_verification` — builds the email
+// and sends it via whatever `EmailSender` is configured.
+async fn send_verification_email(state: &SharedState, to: &str, token: &str) {
+    let base_url =
+        std::env::var("APP_BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+    let verify_link = format!("{base_url}/auth/verify-email?token={token}");
+    let html_body = VERIFY_EMAIL_TEMPLATE.replace("{{VERIFY_LINK}}", &verify_link);
+
+    if let Err(err) = state.mailer.send(to, "Confirm your email", html_body).await {
+        eprintln!("Failed to send verification email: {err}");
+    }
+}
 
 pub async fn register(
     State(state): State<SharedState>,
@@ -36,11 +52,13 @@ pub async fn register(
         .to_string();
 
     let verification_token = Uuid::new_v4().to_string();
-    let expires_at = Utc::now() + Duration::hours(24);
+    let now = Utc::now();
+    let expires_at = now + Duration::hours(24);
 
     let query = format!(
-        "INSERT INTO users (email, password_hash, verification_token, verification_token_expires_at)
-         VALUES ($1, $2, $3, $4)
+        "INSERT INTO users
+            (email, password_hash, verification_token, verification_token_expires_at, last_verification_sent_at)
+         VALUES ($1, $2, $3, $4, $5)
          RETURNING {USER_COLUMNS}"
     );
 
@@ -49,6 +67,7 @@ pub async fn register(
         .bind(password_hash)
         .bind(&verification_token)
         .bind(expires_at)
+        .bind(now)
         .fetch_one(&state.db)
         .await
         .map_err(|err| {
@@ -60,21 +79,7 @@ pub async fn register(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    let base_url = std::env::var("APP_BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
-    let verify_link = format!("{base_url}/auth/verify-email?token={verification_token}");
-    let html_body = VERIFY_EMAIL_TEMPLATE.replace("{{VERIFY_LINK}}", &verify_link);
-
-    // We deliberately don't fail registration if the email fails to
-    // send (e.g. MailHog is briefly down) — the user account still
-    // exists, they'd just need to request a new verification link.
-    // We just log it for now.
-    if let Err(err) = state
-        .mailer
-        .send(&payload.email, "Confirm your email", html_body)
-        .await
-    {
-        eprintln!("Failed to send verification email: {err}");
-    }
+    send_verification_email(&state, &payload.email, &verification_token).await;
 
     Ok(Json(user))
 }
@@ -142,4 +147,64 @@ pub async fn verify_email(
     } else {
         Err(StatusCode::BAD_REQUEST)
     }
+}
+
+pub async fn resend_verification(
+    State(state): State<SharedState>,
+    Json(payload): Json<ResendVerification>,
+) -> Json<MessageResponse> {
+    // Always return this exact message, no matter what happens below —
+    // whether the email doesn't exist, is already verified, or is on
+    // cooldown, an attacker gets the same response either way. This is
+    // the same "don't leak account existence" principle from login.
+    let generic = Json(MessageResponse {
+        message: "If that email exists and isn't verified yet, a new verification link has been sent."
+            .to_string(),
+    });
+
+    let query = format!("SELECT {USER_COLUMNS} FROM users WHERE email = $1");
+    let user = match sqlx::query_as::<_, User>(sqlx::AssertSqlSafe(query))
+        .bind(&payload.email)
+        .fetch_optional(&state.db)
+        .await
+    {
+        Ok(Some(user)) => user,
+        _ => return generic, // not found, or a DB error — respond identically
+    };
+
+    if user.email_verified_at.is_some() {
+        return generic;
+    }
+
+    let now = Utc::now();
+    if let Some(last_sent) = user.last_verification_sent_at {
+        if now - last_sent < RESEND_COOLDOWN {
+            // Still within cooldown — silently do nothing, but the
+            // response looks exactly the same to the caller.
+            return generic;
+        }
+    }
+
+    let verification_token = Uuid::new_v4().to_string();
+    let expires_at: DateTime<Utc> = now + Duration::hours(24);
+
+    let update_result = sqlx::query(
+        "UPDATE users
+         SET verification_token = $1,
+             verification_token_expires_at = $2,
+             last_verification_sent_at = $3
+         WHERE id = $4",
+    )
+    .bind(&verification_token)
+    .bind(expires_at)
+    .bind(now)
+    .bind(user.id)
+    .execute(&state.db)
+    .await;
+
+    if update_result.is_ok() {
+        send_verification_email(&state, &payload.email, &verification_token).await;
+    }
+
+    generic
 }

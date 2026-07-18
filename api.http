@@ -146,3 +146,34 @@ Authorization: Bearer {{loginNew.response.body.token}}
   "event_type": "in_person",
   "location": "Somewhere"
 }
+
+###############################################
+# RESEND VERIFICATION + RATE LIMITING
+###############################################
+
+### Resend verification for the unverified user from earlier
+POST {{baseUrl}}/auth/resend-verification
+Content-Type: application/json
+
+{
+  "email": "newuser@example.com"
+}
+
+### Immediately resend again — should still return the SAME generic
+### message, but check MailHog: no second email should actually arrive
+### (cooldown, silently ignored)
+POST {{baseUrl}}/auth/resend-verification
+Content-Type: application/json
+
+{
+  "email": "newuser@example.com"
+}
+
+### Try a totally made-up email — response should look IDENTICAL to
+### the two above, proving we don't leak whether an email is registered
+POST {{baseUrl}}/auth/resend-verification
+Content-Type: application/json
+
+{
+  "email": "this-email-does-not-exist@example.com"
+}
