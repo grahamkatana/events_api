@@ -7,7 +7,7 @@ pub async fn list_events(
     State(state): State<SharedState>,
 ) -> Result<Json<Vec<Event>>, StatusCode> {
     let events = sqlx::query_as::<_, Event>(
-        "SELECT id, name, created_at FROM events ORDER BY id",
+        "SELECT id, name, created_at, user_id FROM events ORDER BY id",
     )
     .fetch_all(&state.db)
     .await
@@ -21,7 +21,7 @@ pub async fn get_event(
     Path(id): Path<i32>,
 ) -> Result<Json<Event>, StatusCode> {
     let event = sqlx::query_as::<_, Event>(
-        "SELECT id, name, created_at FROM events WHERE id = $1",
+        "SELECT id, name, created_at, user_id FROM events WHERE id = $1",
     )
     .bind(id)
     .fetch_optional(&state.db)
@@ -36,13 +36,15 @@ pub async fn get_event(
 
 pub async fn create_event(
     State(state): State<SharedState>,
-    _user: AuthUser,
+    user: AuthUser,
     Json(payload): Json<CreateEvent>,
 ) -> Result<Json<Event>, StatusCode> {
     let event = sqlx::query_as::<_, Event>(
-        "INSERT INTO events (name) VALUES ($1) RETURNING id, name, created_at",
+        "INSERT INTO events (name, user_id) VALUES ($1, $2)
+         RETURNING id, name, created_at, user_id",
     )
     .bind(payload.name)
+    .bind(user.user_id)
     .fetch_one(&state.db)
     .await
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
@@ -57,7 +59,8 @@ pub async fn update_event(
     Json(payload): Json<UpdateEvent>,
 ) -> Result<Json<Event>, StatusCode> {
     let event = sqlx::query_as::<_, Event>(
-        "UPDATE events SET name = $1 WHERE id = $2 RETURNING id, name, created_at",
+        "UPDATE events SET name = $1 WHERE id = $2
+         RETURNING id, name, created_at, user_id",
     )
     .bind(payload.name)
     .bind(id)
