@@ -40,6 +40,16 @@ async fn send_verification_email(state: &SharedState, to: &str, token: &str) {
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/auth/register",
+    tag = "auth",
+    request_body = RegisterUser,
+    responses(
+        (status = 200, description = "User registered, verification email sent", body = User),
+        (status = 409, description = "Email already registered")
+    )
+)]
 pub async fn register(
     State(state): State<SharedState>,
     Json(payload): Json<RegisterUser>,
@@ -85,6 +95,16 @@ pub async fn register(
     Ok(Json(user))
 }
 
+#[utoipa::path(
+    post,
+    path = "/auth/login",
+    tag = "auth",
+    request_body = LoginUser,
+    responses(
+        (status = 200, description = "Login successful", body = TokenResponse),
+        (status = 401, description = "Invalid email or password")
+    )
+)]
 pub async fn login(
     State(state): State<SharedState>,
     Json(payload): Json<LoginUser>,
@@ -150,6 +170,15 @@ pub async fn verify_email(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/auth/resend-verification",
+    tag = "auth",
+    request_body = ResendVerification,
+    responses(
+        (status = 200, description = "Generic confirmation message (always the same, regardless of outcome)", body = MessageResponse)
+    )
+)]
 pub async fn resend_verification(
     State(state): State<SharedState>,
     Json(payload): Json<ResendVerification>,

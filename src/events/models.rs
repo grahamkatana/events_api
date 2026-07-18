@@ -1,8 +1,8 @@
-
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(Serialize, Deserialize, Clone, sqlx::Type)]
+#[derive(Serialize, Deserialize, Clone, sqlx::Type, ToSchema)]
 #[sqlx(type_name = "event_type", rename_all = "snake_case")]
 #[serde(rename_all = "snake_case")]
 pub enum EventType {
@@ -11,7 +11,7 @@ pub enum EventType {
     Hybrid,
 }
 
-#[derive(Serialize, Clone, sqlx::FromRow)]
+#[derive(Serialize, Clone, sqlx::FromRow, ToSchema)]
 pub struct Event {
     pub id: i32,
     pub name: String,
@@ -22,10 +22,11 @@ pub struct Event {
     pub created_at: DateTime<Utc>,
 
     #[serde(skip_serializing)]
+    #[schema(ignore)]
     pub user_id: Option<i32>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct CreateEvent {
     pub name: String,
     pub details: Option<String>,
@@ -33,7 +34,7 @@ pub struct CreateEvent {
     pub location: Option<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, ToSchema)]
 pub struct UpdateEvent {
     pub name: String,
     pub details: Option<String>,

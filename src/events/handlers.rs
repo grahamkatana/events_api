@@ -12,6 +12,14 @@ use uuid::Uuid;
 const EVENT_COLUMNS: &str =
     "id, name, details, event_type, location, cover_image_url, created_at, user_id";
 
+#[utoipa::path(
+    get,
+    path = "/events",
+    tag = "events",
+    responses(
+        (status = 200, description = "List all events", body = Vec<Event>)
+    )
+)]
 pub async fn list_events(
     State(state): State<SharedState>,
 ) -> Result<Json<Vec<Event>>, StatusCode> {
@@ -24,6 +32,16 @@ pub async fn list_events(
     Ok(Json(events))
 }
 
+#[utoipa::path(
+    get,
+    path = "/events/{id}",
+    tag = "events",
+    params(("id" = i32, Path, description = "Event id")),
+    responses(
+        (status = 200, description = "Event found", body = Event),
+        (status = 404, description = "Event not found")
+    )
+)]
 pub async fn get_event(
     State(state): State<SharedState>,
     Path(id): Path<i32>,
@@ -41,6 +59,18 @@ pub async fn get_event(
     }
 }
 
+#[utoipa::path(
+    post,
+    path = "/events",
+    tag = "events",
+    security(("bearer_auth" = [])),
+    request_body = CreateEvent,
+    responses(
+        (status = 200, description = "Event created", body = Event),
+        (status = 401, description = "Missing or invalid token"),
+        (status = 403, description = "Email not verified")
+    )
+)]
 pub async fn create_event(
     State(state): State<SharedState>,
     user: VerifiedUser,
@@ -84,6 +114,19 @@ async fn require_ownership(
     Ok(())
 }
 
+#[utoipa::path(
+    put,
+    path = "/events/{id}",
+    tag = "events",
+    security(("bearer_auth" = [])),
+    params(("id" = i32, Path, description = "Event id")),
+    request_body = UpdateEvent,
+    responses(
+        (status = 200, description = "Event updated", body = Event),
+        (status = 403, description = "Not the event's owner"),
+        (status = 404, description = "Event not found")
+    )
+)]
 pub async fn update_event(
     State(state): State<SharedState>,
     user: AuthUser,
@@ -110,6 +153,18 @@ pub async fn update_event(
     Ok(Json(event))
 }
 
+#[utoipa::path(
+    delete,
+    path = "/events/{id}",
+    tag = "events",
+    security(("bearer_auth" = [])),
+    params(("id" = i32, Path, description = "Event id")),
+    responses(
+        (status = 204, description = "Event deleted"),
+        (status = 403, description = "Not the event's owner"),
+        (status = 404, description = "Event not found")
+    )
+)]
 pub async fn delete_event(
     State(state): State<SharedState>,
     user: AuthUser,

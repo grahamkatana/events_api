@@ -4,10 +4,13 @@ mod events;
 
 use axum::extract::DefaultBodyLimit;
 use common::email::SmtpMailer;
+use common::openapi::ApiDoc;
 use common::state::{AppState, SharedState};
 use common::storage::Storage;
 use std::sync::Arc;
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
 #[tokio::main]
 async fn main() {
@@ -62,6 +65,7 @@ async fn main() {
 
     let app = events::routes::build_router(shared.clone())
         .merge(auth::routes::build_router(shared.clone()))
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         // Caps every request body at 5MB — generous for a cover image,
         // but stops someone from uploading a 2GB file and tying up
         // memory/bandwidth. Applies to the whole app, not just uploads.
