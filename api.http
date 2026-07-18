@@ -177,3 +177,25 @@ Content-Type: application/json
 {
   "email": "this-email-does-not-exist@example.com"
 }
+
+###############################################
+# COVER IMAGE UPLOAD
+###############################################
+
+### Upload a cover image for the event created earlier
+### NOTE: place a real image file named "cover.jpg" next to this
+### .http file first (same folder as Cargo.toml) — the "< ./cover.jpg"
+### line below tells REST Client to read that file's actual bytes.
+POST {{baseUrl}}/events/{{createEvent.response.body.id}}/cover
+Content-Type: multipart/form-data; boundary=----EventsApiBoundary
+Authorization: Bearer {{login.response.body.token}}
+
+------EventsApiBoundary
+Content-Disposition: form-data; name="file"; filename="cover.jpg"
+Content-Type: image/jpeg
+
+< ./cover.jpg
+------EventsApiBoundary--
+
+### Confirm the cover_image_url is now set
+GET {{baseUrl}}/events/{{createEvent.response.body.id}}

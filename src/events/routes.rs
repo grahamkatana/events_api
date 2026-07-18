@@ -1,4 +1,4 @@
-use super::handlers::{create_event, delete_event, get_event, list_events, update_event};
+use super::handlers::{create_event, delete_event, get_event, list_events, update_event, upload_cover};
 use crate::common::state::SharedState;
 use axum::{routing::get, Router};
 
@@ -9,5 +9,6 @@ pub fn build_router(state: SharedState) -> Router {
             "/events/{id}",
             get(get_event).put(update_event).delete(delete_event),
         )
+        .route("/events/{id}/cover", axum::routing::post(upload_cover))
         .with_state(state)
 }

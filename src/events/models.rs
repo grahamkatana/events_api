@@ -1,3 +1,4 @@
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -17,6 +18,7 @@ pub struct Event {
     pub details: Option<String>,
     pub event_type: EventType,
     pub location: Option<String>,
+    pub cover_image_url: Option<String>,
     pub created_at: DateTime<Utc>,
 
     #[serde(skip_serializing)]

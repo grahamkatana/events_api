@@ -2,8 +2,10 @@ mod auth;
 mod common;
 mod events;
 
+use axum::extract::DefaultBodyLimit;
 use common::email::SmtpMailer;
 use common::state::{AppState, SharedState};
+use common::storage::Storage;
 use std::sync::Arc;
 
 #[tokio::main]
@@ -24,15 +26,21 @@ async fn main() {
     println!("Connected to database successfully");
 
     let mailer = Arc::new(SmtpMailer::from_env());
+    let storage = Storage::from_env().await;
 
     let shared: SharedState = AppState {
         db: pool,
         jwt_secret,
         mailer,
+        storage,
     };
 
     let app = events::routes::build_router(shared.clone())
-        .merge(auth::routes::build_router(shared.clone()));
+        .merge(auth::routes::build_router(shared.clone()))
+        // Caps every request body at 5MB — generous for a cover image,
+        // but stops someone from uploading a 2GB file and tying up
+        // memory/bandwidth. Applies to the whole app, not just uploads.
+        .layer(DefaultBodyLimit::max(5 * 1024 * 1024));
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     println!("Listening on http://0.0.0.0:3000");

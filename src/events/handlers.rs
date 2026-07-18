@@ -1,9 +1,15 @@
 use super::models::{CreateEvent, Event, UpdateEvent};
 use crate::auth::extractor::{AuthUser, VerifiedUser};
 use crate::common::state::SharedState;
-use axum::{extract::{Path, State}, http::StatusCode, Json};
+use axum::{
+    extract::{Multipart, Path, State},
+    http::StatusCode,
+    Json,
+};
+use uuid::Uuid;
 
-const EVENT_COLUMNS: &str = "id, name, details, event_type, location, created_at, user_id";
+const EVENT_COLUMNS: &str =
+    "id, name, details, event_type, location, cover_image_url, created_at, user_id";
 
 pub async fn list_events(
     State(state): State<SharedState>,
@@ -117,4 +123,72 @@ pub async fn delete_event(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
     Ok(StatusCode::NO_CONTENT)
+}
+
+pub async fn upload_cover(
+    State(state): State<SharedState>,
+    user: AuthUser,
+    Path(id): Path<i32>,
+    mut multipart: Multipart,
+) -> Result<Json<Event>, StatusCode> {
+    require_ownership(&state, id, user.user_id).await?;
+
+    let mut file_bytes: Option<Vec<u8>> = None;
+    let mut content_type = String::from("application/octet-stream");
+    let mut extension = String::from("bin");
+
+    // A multipart request is made of one or more named "fields" —
+    // we loop through them looking for the one named "file". Real
+    // forms could have other fields alongside it (e.g. a caption).
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|_| StatusCode::BAD_REQUEST)?
+    {
+        if field.name() == Some("file") {
+            content_type = field
+                .content_type()
+                .unwrap_or("application/octet-stream")
+                .to_string();
+
+            if let Some(name) = field.file_name() {
+                if let Some(ext) = name.rsplit('.').next() {
+                    extension = ext.to_string();
+                }
+            }
+
+            let data = field.bytes().await.map_err(|_| StatusCode::BAD_REQUEST)?;
+            file_bytes = Some(data.to_vec());
+        }
+    }
+
+    let bytes = file_bytes.ok_or(StatusCode::BAD_REQUEST)?;
+
+    // Reject anything that isn't declared as an image. Not bulletproof
+    // (a client could lie about content-type) but a reasonable first
+    // line of defense; a stricter version would also inspect the raw
+    // bytes for a real image "magic number" before trusting this.
+    if !content_type.starts_with("image/") {
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    let key = format!("events/{id}/{}.{extension}", Uuid::new_v4());
+
+    let url = state
+        .storage
+        .upload(&key, bytes, &content_type)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let query = format!(
+        "UPDATE events SET cover_image_url = $1 WHERE id = $2 RETURNING {EVENT_COLUMNS}"
+    );
+    let event = sqlx::query_as::<_, Event>(sqlx::AssertSqlSafe(query))
+        .bind(url)
+        .bind(id)
+        .fetch_one(&state.db)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(event))
 }
