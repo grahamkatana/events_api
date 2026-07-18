@@ -4,10 +4,6 @@ use super::models::{
     VerifyEmailQuery,
 };
 use crate::common::state::SharedState;
-use argon2::{
-    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
-    Argon2,
-};
 use axum::{
     extract::{Query, State},
     http::StatusCode,
@@ -16,7 +12,6 @@ use axum::{
 };
 use chrono::{DateTime, Duration, Utc};
 use jsonwebtoken::{encode, EncodingKey, Header};
-use rand_core::OsRng;
 use uuid::Uuid;
 
 const USER_COLUMNS: &str =
@@ -54,13 +49,8 @@ pub async fn register(
     State(state): State<SharedState>,
     Json(payload): Json<RegisterUser>,
 ) -> Result<Json<User>, StatusCode> {
-    let salt = SaltString::generate(&mut OsRng);
-    let argon2 = Argon2::default();
-
-    let password_hash = argon2
-        .hash_password(payload.password.as_bytes(), &salt)
-        .map_err(log_error)?
-        .to_string();
+    let password_hash = crate::common::password::hash_password(&payload.password)
+        .map_err(log_error)?;
 
     let verification_token = Uuid::new_v4().to_string();
     let now = Utc::now();
@@ -117,12 +107,9 @@ pub async fn login(
         .map_err(log_error)?
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
-    let parsed_hash = PasswordHash::new(&user.password_hash)
-        .map_err(log_error)?;
-
-    Argon2::default()
-        .verify_password(payload.password.as_bytes(), &parsed_hash)
-        .map_err(|_| StatusCode::UNAUTHORIZED)?;
+    if !crate::common::password::verify_password(&payload.password, &user.password_hash) {
+        return Err(StatusCode::UNAUTHORIZED);
+    }
 
     let expiration = Utc::now()
         .checked_add_signed(Duration::hours(24))
