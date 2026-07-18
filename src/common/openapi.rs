@@ -26,6 +26,7 @@ use utoipa::{
         crate::events::models::EventType,
         crate::events::models::CreateEvent,
         crate::events::models::UpdateEvent,
+        crate::events::models::PaginatedEvents,
     )),
     tags(
         (name = "auth", description = "Registration, login, and email verification"),

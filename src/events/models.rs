@@ -42,6 +42,31 @@ pub struct UpdateEvent {
     pub location: Option<String>,
 }
 
+fn default_page() -> i64 {
+    1
+}
+
+fn default_per_page() -> i64 {
+    20
+}
+
+#[derive(Deserialize)]
+pub struct PaginationParams {
+    #[serde(default = "default_page")]
+    pub page: i64,
+    #[serde(default = "default_per_page")]
+    pub per_page: i64,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct PaginatedEvents {
+    pub data: Vec<Event>,
+    pub page: i64,
+    pub per_page: i64,
+    pub total: i64,
+    pub total_pages: i64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

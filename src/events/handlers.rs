@@ -1,10 +1,10 @@
 use crate::common::error::log_error;
-use super::models::{CreateEvent, Event, UpdateEvent};
+use super::models::{CreateEvent, Event, PaginatedEvents, PaginationParams, UpdateEvent};
 use super::ws::{broadcast_created, broadcast_deleted, broadcast_updated};
 use crate::auth::extractor::{AuthUser, VerifiedUser};
 use crate::common::state::SharedState;
 use axum::{
-    extract::{Multipart, Path, State},
+    extract::{Multipart, Path, Query, State},
     http::StatusCode,
     Json,
 };
@@ -17,20 +17,47 @@ const EVENT_COLUMNS: &str =
     get,
     path = "/events",
     tag = "events",
+    params(
+        ("page" = Option<i64>, Query, description = "Page number, starting at 1 (default 1)"),
+        ("per_page" = Option<i64>, Query, description = "Items per page, 1-100 (default 20)")
+    ),
     responses(
-        (status = 200, description = "List all events", body = Vec<Event>)
+        (status = 200, description = "Paginated list of events", body = PaginatedEvents)
     )
 )]
 pub async fn list_events(
     State(state): State<SharedState>,
-) -> Result<Json<Vec<Event>>, StatusCode> {
-    let query = format!("SELECT {EVENT_COLUMNS} FROM events ORDER BY id");
+    Query(params): Query<PaginationParams>,
+) -> Result<Json<PaginatedEvents>, StatusCode> {
+    // Guard against nonsense input — a negative page, or a per_page of
+    // 10,000 someone could use to try to pull the entire table in one
+    // request regardless of what the client asked for.
+    let page = params.page.max(1);
+    let per_page = params.per_page.clamp(1, 100);
+    let offset = (page - 1) * per_page;
+
+    let query = format!("SELECT {EVENT_COLUMNS} FROM events ORDER BY id LIMIT $1 OFFSET $2");
     let events = sqlx::query_as::<_, Event>(sqlx::AssertSqlSafe(query))
+        .bind(per_page)
+        .bind(offset)
         .fetch_all(&state.db)
         .await
         .map_err(log_error)?;
 
-    Ok(Json(events))
+    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM events")
+        .fetch_one(&state.db)
+        .await
+        .map_err(log_error)?;
+
+    let total_pages = (total as f64 / per_page as f64).ceil() as i64;
+
+    Ok(Json(PaginatedEvents {
+        data: events,
+        page,
+        per_page,
+        total,
+        total_pages,
+    }))
 }
 
 #[utoipa::path(
