@@ -1,9 +1,11 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, sqlx::FromRow)]
 pub struct Event {
-    pub id: u32,
+    pub id: i32,
     pub name: String,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Deserialize)]

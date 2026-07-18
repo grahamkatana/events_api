@@ -2,12 +2,9 @@ mod common;
 mod events;
 
 use common::state::{AppState, SharedState};
-use events::models::Event;
-use std::sync::{Arc, Mutex};
 
 #[tokio::main]
 async fn main() {
-    // Load variables from .env into the environment.
     dotenvy::dotenv().ok();
 
     let database_url = std::env::var("DATABASE_URL")
@@ -19,18 +16,9 @@ async fn main() {
         .await
         .expect("Failed to connect to Postgres");
 
-    println!("✅ Connected to Postgres!");
-    drop(pool);
+    println!("Connected to Postgres!");
 
-    let initial_state = AppState {
-        events: vec![
-            Event { id: 1, name: String::from("Rust Meetup") },
-            Event { id: 2, name: String::from("Jazz Night") },
-        ],
-        next_id: 3,
-    };
-
-    let shared: SharedState = Arc::new(Mutex::new(initial_state));
+    let shared: SharedState = AppState { db: pool };
 
     let app = events::routes::build_router(shared);
 
