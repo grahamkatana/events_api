@@ -31,3 +31,21 @@ DELETE {{baseUrl}}/events/2
 
 ### Confirm it's gone
 GET {{baseUrl}}/events
+
+### Register a new user
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "you@example.com",
+  "password": "supersecret123"
+}
+
+### Login (get a JWT back)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "you@example.com",
+  "password": "supersecret123"
+}
