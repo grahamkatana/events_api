@@ -51,8 +51,8 @@ Authorization: Bearer {{login.response.body.token}}
 {
   "name": "Cover Upload Test Event",
   "details": "Testing the full flow",
-  "event_type": "in_person",
-  "location": "Test Location"
+  "event_type": "virtual",
+  "location": null
 }
 
 ###############################################

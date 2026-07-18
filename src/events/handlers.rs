@@ -1,5 +1,5 @@
 use crate::common::error::log_error;
-use super::models::{CreateEvent, Event, PaginatedEvents, PaginationParams, UpdateEvent};
+use super::models::{CreateEvent, Event, PaginatedEvents, PaginationParams, UpdateEvent, EventType};
 use super::ws::{broadcast_created, broadcast_deleted, broadcast_updated};
 use crate::auth::extractor::{AuthUser, VerifiedUser};
 use crate::common::state::SharedState;
@@ -11,7 +11,7 @@ use axum::{
 use uuid::Uuid;
 
 const EVENT_COLUMNS: &str =
-    "id, name, details, event_type, location, cover_image_url, created_at, user_id";
+    "id, name, details, event_type, location, cover_image_url, meeting_url, created_at, user_id";
 
 #[utoipa::path(
     get,
@@ -104,9 +104,22 @@ pub async fn create_event(
     user: VerifiedUser,
     Json(payload): Json<CreateEvent>,
 ) -> Result<Json<Event>, StatusCode> {
+    let needs_meeting_link = matches!(payload.event_type, EventType::Virtual | EventType::Hybrid);
+
+    let meeting_url = if needs_meeting_link {
+        match state.video.create_room().await {
+            Ok(url) => Some(url),
+            Err(err) => {
+                tracing::error!("failed to create video room: {err}");
+                None
+            }
+        }
+    } else {
+        None
+    };
     let query = format!(
-        "INSERT INTO events (name, details, event_type, location, user_id)
-         VALUES ($1, $2, $3, $4, $5)
+        "INSERT INTO events (name, details, event_type, location, meeting_url, user_id)
+         VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING {EVENT_COLUMNS}"
     );
     let event = sqlx::query_as::<_, Event>(sqlx::AssertSqlSafe(query))
@@ -114,6 +127,7 @@ pub async fn create_event(
         .bind(payload.details)
         .bind(payload.event_type)
         .bind(payload.location)
+        .bind(meeting_url)
         .bind(user.user_id)
         .fetch_one(&state.db)
         .await

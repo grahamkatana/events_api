@@ -1,5 +1,6 @@
 use crate::common::email::EmailSender;
 use crate::common::storage::Storage;
+use crate::common::video::VideoClient;
 use sqlx::PgPool;
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -14,6 +15,7 @@ pub struct AppState {
     // every value sent goes to ALL current subscribers — perfect for
     // "notify every connected WebSocket client at once."
     pub ws_tx: broadcast::Sender<String>,
+    pub video: VideoClient,
 }
 
 pub type SharedState = AppState;

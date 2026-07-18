@@ -19,6 +19,7 @@ pub struct Event {
     pub event_type: EventType,
     pub location: Option<String>,
     pub cover_image_url: Option<String>,
+    pub meeting_url: Option<String>,
     pub created_at: DateTime<Utc>,
 
     #[serde(skip_serializing)]

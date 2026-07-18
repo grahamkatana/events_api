@@ -25,6 +25,7 @@ pub async fn build_app(database_url: &str, jwt_secret: String) -> Router {
 
     let mailer = Arc::new(SmtpMailer::from_env());
     let storage = Storage::from_env().await;
+    let video = crate::common::video::VideoClient::from_env();
     let (ws_tx, _) = tokio::sync::broadcast::channel::<String>(100);
 
     let shared: SharedState = AppState {
@@ -33,6 +34,7 @@ pub async fn build_app(database_url: &str, jwt_secret: String) -> Router {
         mailer,
         storage,
         ws_tx,
+        video
     };
 
     events::routes::build_router(shared.clone())
