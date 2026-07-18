@@ -1,4 +1,5 @@
 use super::models::{CreateEvent, Event, UpdateEvent};
+use crate::auth::extractor::AuthUser;
 use crate::common::state::SharedState;
 use axum::{extract::{Path, State}, http::StatusCode, Json};
 
@@ -35,6 +36,7 @@ pub async fn get_event(
 
 pub async fn create_event(
     State(state): State<SharedState>,
+    _user: AuthUser,
     Json(payload): Json<CreateEvent>,
 ) -> Result<Json<Event>, StatusCode> {
     let event = sqlx::query_as::<_, Event>(
@@ -50,6 +52,7 @@ pub async fn create_event(
 
 pub async fn update_event(
     State(state): State<SharedState>,
+    _user: AuthUser,
     Path(id): Path<i32>,
     Json(payload): Json<UpdateEvent>,
 ) -> Result<Json<Event>, StatusCode> {
@@ -70,6 +73,7 @@ pub async fn update_event(
 
 pub async fn delete_event(
     State(state): State<SharedState>,
+    _user: AuthUser,
     Path(id): Path<i32>,
 ) -> Result<StatusCode, StatusCode> {
     let result = sqlx::query("DELETE FROM events WHERE id = $1")
