@@ -93,3 +93,56 @@ Authorization: Bearer {{login.response.body.token}}
 
 ### Confirm it's gone
 GET {{baseUrl}}/events/{{createEvent.response.body.id}}
+
+###############################################
+# EMAIL VERIFICATION FLOW
+###############################################
+
+### 1. Register a NEW user (use a fresh email each time you re-test)
+# @name registerNew
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "newuser@example.com",
+  "password": "supersecret123"
+}
+
+### 2. Login as that new (still unverified) user
+# @name loginNew
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "newuser@example.com",
+  "password": "supersecret123"
+}
+
+### 3. Try creating an event as an UNVERIFIED user (should be 403 Forbidden)
+POST {{baseUrl}}/events
+Content-Type: application/json
+Authorization: Bearer {{loginNew.response.body.token}}
+
+{
+  "name": "Should Be Blocked",
+  "details": "This user hasn't verified their email",
+  "event_type": "virtual",
+  "location": null
+}
+
+### 4. Now go to http://localhost:8026 (MailHog web UI), open the email,
+###    copy the verification link, and paste the token below manually.
+###    (The token is the ?token=... value at the end of that link.)
+GET {{baseUrl}}/auth/verify-email?token=PASTE_TOKEN_HERE
+
+### 5. Now try creating an event again — should succeed
+POST {{baseUrl}}/events
+Content-Type: application/json
+Authorization: Bearer {{loginNew.response.body.token}}
+
+{
+  "name": "Should Now Succeed",
+  "details": "Email is verified",
+  "event_type": "in_person",
+  "location": "Somewhere"
+}

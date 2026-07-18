@@ -10,6 +10,10 @@ pub struct User {
     #[serde(skip_serializing)]
     pub password_hash: String,
 
+    // Visible to the client — useful to show "please verify your email"
+    // in a UI, so this one is NOT skip_serializing.
+    pub email_verified_at: Option<DateTime<Utc>>,
+
     pub created_at: DateTime<Utc>,
 }
 
@@ -25,9 +29,12 @@ pub struct LoginUser {
     pub password: String,
 }
 
-// `sub` ("subject") and `exp` ("expiration") are standard JWT claim
-// names — using them means any JWT-aware tool can read this token
-// even outside our own app.
+// Used with the `Query` extractor to read `?token=...` from the URL.
+#[derive(Deserialize)]
+pub struct VerifyEmailQuery {
+    pub token: String,
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Claims {
     pub sub: i32,

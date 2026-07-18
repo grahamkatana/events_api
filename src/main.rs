@@ -2,7 +2,9 @@ mod auth;
 mod common;
 mod events;
 
+use common::email::SmtpMailer;
 use common::state::{AppState, SharedState};
+use std::sync::Arc;
 
 #[tokio::main]
 async fn main() {
@@ -21,9 +23,12 @@ async fn main() {
 
     println!("Connected to database successfully");
 
+    let mailer = Arc::new(SmtpMailer::from_env());
+
     let shared: SharedState = AppState {
         db: pool,
         jwt_secret,
+        mailer,
     };
 
     let app = events::routes::build_router(shared.clone())

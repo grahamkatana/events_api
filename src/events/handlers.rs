@@ -1,5 +1,5 @@
 use super::models::{CreateEvent, Event, UpdateEvent};
-use crate::auth::extractor::AuthUser;
+use crate::auth::extractor::{AuthUser, VerifiedUser};
 use crate::common::state::SharedState;
 use axum::{extract::{Path, State}, http::StatusCode, Json};
 
@@ -36,7 +36,7 @@ pub async fn get_event(
 
 pub async fn create_event(
     State(state): State<SharedState>,
-    user: AuthUser,
+    user: VerifiedUser,
     Json(payload): Json<CreateEvent>,
 ) -> Result<Json<Event>, StatusCode> {
     let query = format!(

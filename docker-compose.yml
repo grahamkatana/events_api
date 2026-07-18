@@ -26,5 +26,15 @@ services:
     depends_on:
       - postgres
 
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: events_api_mailhog
+    restart: unless-stopped
+    ports:
+      # SMTP — this is what our Rust app connects to, to "send" mail
+      - "1026:1025"
+      # Web UI — open this in your browser to see captured emails
+      - "8026:8025"
+
 volumes:
   events_pg_data:
