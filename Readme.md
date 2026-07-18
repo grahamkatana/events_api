@@ -10,15 +10,18 @@ A REST API for managing events, built with Rust, Axum, and PostgreSQL.
 - **PostgreSQL** — primary database
 - **MinIO** — S3-compatible object storage for event cover images
 - **MailHog** — local SMTP catcher for development email
+- **Digital Samba** — video conferencing API for virtual/hybrid event meeting links
 - **utoipa** + Swagger UI — OpenAPI docs
 
 ## Features
 
 - Event CRUD (create, list, get, update, delete)
+- Paginated event listing
 - JWT-based authentication (register, login)
 - Email verification with resend + rate limiting
 - Ownership enforcement (only an event's creator can modify or delete it)
 - Cover image upload via MinIO
+- Automatic video meeting link generation for virtual/hybrid events (Digital Samba)
 - Live updates over WebSocket when events change
 - Request logging (console + rotating daily log files)
 - OpenAPI documentation via Swagger UI
@@ -103,6 +106,24 @@ sqlx migrate run --database-url postgres://events_user:events_password@localhost
 cargo test
 ```
 
+## Pagination
+
+`GET /events` accepts `page` and `per_page` query parameters (defaults: page 1, 20 per page; `per_page` is capped at 100). Response shape:
+
+```json
+{
+  "data": [ ... ],
+  "page": 1,
+  "per_page": 20,
+  "total": 47,
+  "total_pages": 3
+}
+```
+
+## Video meetings
+
+When creating an event with `"event_type": "virtual"` or `"hybrid"`, the API automatically creates a video conferencing room via Digital Samba and returns its URL as `meeting_url` on the created event. `in_person` events always have `meeting_url: null`. If room creation fails (e.g. the video provider is down), the event is still created — `meeting_url` is simply left `null` and the failure is logged.
+
 ## WebSocket
 
 Connect to `ws://localhost:3000/ws` to receive live notifications whenever an event is created, updated, or deleted. Messages are JSON, tagged by `type`:
@@ -132,6 +153,7 @@ Creating an event requires a verified email. Updating or deleting an event requi
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` | outgoing email configuration |
 | `APP_BASE_URL` | used to build links in emails |
 | `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET`, `MINIO_PUBLIC_URL` | object storage configuration |
+| `DIGITAL_SAMBA_API_KEY`, `DIGITAL_SAMBA_TEAM_NAME` | video conferencing (get these free at digitalsamba.com, no card required) |
 
 ## Logging
 
