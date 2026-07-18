@@ -1,36 +1,8 @@
 @baseUrl = http://localhost:3000
 
-### List all events
-GET {{baseUrl}}/events
-
-### Get a single event by id
-GET {{baseUrl}}/events/1
-
-### Get a non-existent event (should 404)
-GET {{baseUrl}}/events/99
-
-### Create a new event
-POST {{baseUrl}}/events
-Content-Type: application/json
-
-{
-  "name": "Poetry Slam"
-}
-
-
-### Update an event
-PUT {{baseUrl}}/events/1
-Content-Type: application/json
-
-{
-  "name": "Rust Meetup (Updated)"
-}
-
-### Delete an event
-DELETE {{baseUrl}}/events/2
-
-### Confirm it's gone
-GET {{baseUrl}}/events
+###############################################
+# AUTH
+###############################################
 
 ### Register a new user
 POST {{baseUrl}}/auth/register
@@ -41,7 +13,8 @@ Content-Type: application/json
   "password": "supersecret123"
 }
 
-### Login (get a JWT back)
+### Login (captured as "login" so later requests can reuse the token)
+# @name login
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
@@ -49,3 +22,74 @@ Content-Type: application/json
   "email": "you@example.com",
   "password": "supersecret123"
 }
+
+###############################################
+# EVENTS (public reads)
+###############################################
+
+### List all events
+GET {{baseUrl}}/events
+
+### Get a single event by id
+GET {{baseUrl}}/events/1
+
+### Get a non-existent event (should 404)
+GET {{baseUrl}}/events/9999
+
+###############################################
+# EVENTS (protected writes)
+###############################################
+
+### Try creating an event WITHOUT a token (should be 401)
+POST {{baseUrl}}/events
+Content-Type: application/json
+
+{
+  "name": "Should Fail",
+  "details": "No token provided",
+  "event_type": "virtual",
+  "location": null
+}
+
+### Create an event WITH a token (should succeed)
+# @name createEvent
+POST {{baseUrl}}/events
+Content-Type: application/json
+Authorization: Bearer {{login.response.body.token}}
+
+{
+  "name": "Rust Meetup",
+  "details": "Monthly meetup for Rust enthusiasts",
+  "event_type": "hybrid",
+  "location": "Community Hall"
+}
+
+### Update the event just created (should succeed — you own it)
+PUT {{baseUrl}}/events/{{createEvent.response.body.id}}
+Content-Type: application/json
+Authorization: Bearer {{login.response.body.token}}
+
+{
+  "name": "Rust Meetup (Updated)",
+  "details": "Monthly meetup for Rust enthusiasts — now bigger!",
+  "event_type": "in_person",
+  "location": "Bigger Community Hall"
+}
+
+### Try updating without a token (should be 401)
+PUT {{baseUrl}}/events/{{createEvent.response.body.id}}
+Content-Type: application/json
+
+{
+  "name": "Should Fail",
+  "details": null,
+  "event_type": "virtual",
+  "location": null
+}
+
+### Delete the event just created (should succeed — you own it)
+DELETE {{baseUrl}}/events/{{createEvent.response.body.id}}
+Authorization: Bearer {{login.response.body.token}}
+
+### Confirm it's gone
+GET {{baseUrl}}/events/{{createEvent.response.body.id}}
