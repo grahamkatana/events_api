@@ -1,4 +1,28 @@
 services:
+  app:
+    build: .
+    container_name: events_api_app
+    restart: unless-stopped
+    # Loads everything from your .env by default (JWT_SECRET,
+    # DIGITAL_SAMBA_*, MINIO_PUBLIC_URL, etc.) — then `environment:`
+    # below overrides JUST the values that need to differ when running
+    # INSIDE Docker's network versus running directly on your machine.
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://events_user:events_password@postgres:5432/events_db
+      SMTP_HOST: mailhog
+      SMTP_PORT: "1025"
+      MINIO_ENDPOINT: http://minio:9000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+      - mailhog
+      - minio
+    volumes:
+      - ./storage/logs:/app/storage/logs
+
   postgres:
     image: postgres:16-alpine
     container_name: events_api_postgres
