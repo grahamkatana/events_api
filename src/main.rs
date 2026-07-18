@@ -56,11 +56,17 @@ async fn main() {
     let mailer = Arc::new(SmtpMailer::from_env());
     let storage = Storage::from_env().await;
 
+    // Capacity 100: how many un-received messages can queue up before
+    // a slow subscriber starts missing the oldest ones. Generous for
+    // this app's traffic; irrelevant if nobody's connected at all.
+    let (ws_tx, _) = tokio::sync::broadcast::channel::<String>(100);
+
     let shared: SharedState = AppState {
         db: pool,
         jwt_secret,
         mailer,
         storage,
+        ws_tx,
     };
 
     let app = events::routes::build_router(shared.clone())

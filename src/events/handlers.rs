@@ -1,5 +1,6 @@
 use crate::common::error::log_error;
 use super::models::{CreateEvent, Event, UpdateEvent};
+use super::ws::{broadcast_created, broadcast_deleted, broadcast_updated};
 use crate::auth::extractor::{AuthUser, VerifiedUser};
 use crate::common::state::SharedState;
 use axum::{
@@ -91,6 +92,8 @@ pub async fn create_event(
         .await
         .map_err(log_error)?;
 
+    broadcast_created(&state, &event);
+
     Ok(Json(event))
 }
 
@@ -150,6 +153,8 @@ pub async fn update_event(
         .await
         .map_err(log_error)?;
 
+    broadcast_updated(&state, &event);
+
     Ok(Json(event))
 }
 
@@ -177,6 +182,8 @@ pub async fn delete_event(
         .execute(&state.db)
         .await
         .map_err(log_error)?;
+
+    broadcast_deleted(&state, id);
 
     Ok(StatusCode::NO_CONTENT)
 }
