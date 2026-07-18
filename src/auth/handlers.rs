@@ -1,3 +1,4 @@
+use crate::common::error::log_error;
 use super::models::{
     Claims, LoginUser, MessageResponse, RegisterUser, ResendVerification, TokenResponse, User,
     VerifyEmailQuery,
@@ -48,7 +49,7 @@ pub async fn register(
 
     let password_hash = argon2
         .hash_password(payload.password.as_bytes(), &salt)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .map_err(log_error)?
         .to_string();
 
     let verification_token = Uuid::new_v4().to_string();
@@ -76,7 +77,7 @@ pub async fn register(
                     return StatusCode::CONFLICT;
                 }
             }
-            StatusCode::INTERNAL_SERVER_ERROR
+            log_error(err)
         })?;
 
     send_verification_email(&state, &payload.email, &verification_token).await;
@@ -93,11 +94,11 @@ pub async fn login(
         .bind(&payload.email)
         .fetch_optional(&state.db)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .map_err(log_error)?
         .ok_or(StatusCode::UNAUTHORIZED)?;
 
     let parsed_hash = PasswordHash::new(&user.password_hash)
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(log_error)?;
 
     Argon2::default()
         .verify_password(payload.password.as_bytes(), &parsed_hash)
@@ -118,7 +119,7 @@ pub async fn login(
         &claims,
         &EncodingKey::from_secret(state.jwt_secret.as_bytes()),
     )
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(log_error)?;
 
     Ok(Json(TokenResponse { token }))
 }
@@ -138,7 +139,7 @@ pub async fn verify_email(
     .bind(&params.token)
     .execute(&state.db)
     .await
-    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    .map_err(log_error)?;
 
     if result.rows_affected() > 0 {
         Ok(Html(

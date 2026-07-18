@@ -1,0 +1,82 @@
+@baseUrl = http://localhost:3000
+
+###############################################
+# 1. REGISTER
+###############################################
+
+### Register a new user (change the email if you've used this one before)
+# @name register
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "flowtest@example.com",
+  "password": "supersecret123"
+}
+
+###############################################
+# 2. VERIFY EMAIL
+###############################################
+# Go to http://localhost:8026 (MailHog), open the email sent to
+# flowtest@example.com, copy the verification link's ?token=... value,
+# and paste it below in place of PASTE_TOKEN_HERE. Then send this request.
+
+### Verify email
+GET {{baseUrl}}/auth/verify-email?token=PASTE_TOKEN_HERE
+
+###############################################
+# 3. LOGIN
+###############################################
+
+### Login as the now-verified user
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "flowtest@example.com",
+  "password": "supersecret123"
+}
+
+###############################################
+# 4. CREATE AN EVENT
+###############################################
+
+### Create an event (should succeed — this user is verified)
+# @name newEvent
+POST {{baseUrl}}/events
+Content-Type: application/json
+Authorization: Bearer {{login.response.body.token}}
+
+{
+  "name": "Cover Upload Test Event",
+  "details": "Testing the full flow",
+  "event_type": "in_person",
+  "location": "Test Location"
+}
+
+###############################################
+# 5. UPLOAD A COVER IMAGE
+###############################################
+# Make sure a real image file named "cover.jpg" sits next to this
+# .http file (same folder as Cargo.toml) before sending this request.
+
+### Upload cover image to the event just created
+POST {{baseUrl}}/events/{{newEvent.response.body.id}}/cover
+Content-Type: multipart/form-data; boundary=----EventsApiBoundary
+Authorization: Bearer {{login.response.body.token}}
+
+------EventsApiBoundary
+Content-Disposition: form-data; name="file"; filename="cover.jpg"
+Content-Type: image/jpeg
+
+< ./cover.jpg
+------EventsApiBoundary--
+
+###############################################
+# 6. CONFIRM
+###############################################
+
+### Confirm cover_image_url is now set — open the URL in your
+### browser afterward to make sure MinIO is actually serving the file
+GET {{baseUrl}}/events/{{newEvent.response.body.id}}

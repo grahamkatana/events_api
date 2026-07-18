@@ -1,3 +1,4 @@
+use crate::common::error::log_error;
 use super::models::{CreateEvent, Event, UpdateEvent};
 use crate::auth::extractor::{AuthUser, VerifiedUser};
 use crate::common::state::SharedState;
@@ -18,7 +19,7 @@ pub async fn list_events(
     let events = sqlx::query_as::<_, Event>(sqlx::AssertSqlSafe(query))
         .fetch_all(&state.db)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(log_error)?;
 
     Ok(Json(events))
 }
@@ -32,7 +33,7 @@ pub async fn get_event(
         .bind(id)
         .fetch_optional(&state.db)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(log_error)?;
 
     match event {
         Some(event) => Ok(Json(event)),
@@ -58,7 +59,7 @@ pub async fn create_event(
         .bind(user.user_id)
         .fetch_one(&state.db)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(log_error)?;
 
     Ok(Json(event))
 }
@@ -73,7 +74,7 @@ async fn require_ownership(
         .bind(id)
         .fetch_optional(&state.db)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
+        .map_err(log_error)?
         .ok_or(StatusCode::NOT_FOUND)?;
 
     if existing.user_id != Some(user_id) {
@@ -104,7 +105,7 @@ pub async fn update_event(
         .bind(id)
         .fetch_one(&state.db)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(log_error)?;
 
     Ok(Json(event))
 }
@@ -120,7 +121,7 @@ pub async fn delete_event(
         .bind(id)
         .execute(&state.db)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(log_error)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -178,7 +179,7 @@ pub async fn upload_cover(
         .storage
         .upload(&key, bytes, &content_type)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(log_error)?;
 
     let query = format!(
         "UPDATE events SET cover_image_url = $1 WHERE id = $2 RETURNING {EVENT_COLUMNS}"
@@ -188,7 +189,7 @@ pub async fn upload_cover(
         .bind(id)
         .fetch_one(&state.db)
         .await
-        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        .map_err(log_error)?;
 
     Ok(Json(event))
 }

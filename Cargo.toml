@@ -19,3 +19,7 @@ async-trait = "0.1"
 uuid = { version = "1", features = ["v4"] }
 tower_governor = { version = "0.8", features = ["axum"] }
 aws-sdk-s3 = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tower-http = { version = "0.6", features = ["trace"] }
+tracing-appender = "0.2"
