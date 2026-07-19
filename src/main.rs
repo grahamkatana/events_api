@@ -6,7 +6,12 @@ async fn main() {
 
     std::fs::create_dir_all("storage/logs").expect("failed to create storage/logs directory");
 
-    let file_appender = tracing_appender::rolling::daily("storage/logs", "events_api.log");
+    let file_appender = tracing_appender::rolling::Builder::new()
+        .rotation(tracing_appender::rolling::Rotation::DAILY)
+        .filename_prefix("events_api")
+        .filename_suffix("log")
+        .build("storage/logs")
+        .expect("failed to set up file logging");
     let (non_blocking_file, _guard) = tracing_appender::non_blocking(file_appender);
 
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));

@@ -21,7 +21,7 @@ tower_governor = { version = "0.8", features = ["axum"] }
 aws-sdk-s3 = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-tower-http = { version = "0.6", features = ["trace"] }
+tower-http = { version = "0.6", features = ["trace","cors"] }
 tracing-appender = "0.2"
 utoipa = { version = "5", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-swagger-ui = { version = "9", features = ["axum"] }

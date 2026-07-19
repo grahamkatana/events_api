@@ -8,7 +8,9 @@ use common::email::SmtpMailer;
 use common::openapi::ApiDoc;
 use common::state::{AppState, SharedState};
 use common::storage::Storage;
+use common::video::VideoClient;
 use std::sync::Arc;
+use tower_http::cors::{Any, CorsLayer};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -25,7 +27,7 @@ pub async fn build_app(database_url: &str, jwt_secret: String) -> Router {
 
     let mailer = Arc::new(SmtpMailer::from_env());
     let storage = Storage::from_env().await;
-    let video = crate::common::video::VideoClient::from_env();
+    let video = VideoClient::from_env();
     let (ws_tx, _) = tokio::sync::broadcast::channel::<String>(100);
 
     let shared: SharedState = AppState {
@@ -34,7 +36,7 @@ pub async fn build_app(database_url: &str, jwt_secret: String) -> Router {
         mailer,
         storage,
         ws_tx,
-        video
+        video,
     };
 
     events::routes::build_router(shared.clone())
@@ -42,4 +44,11 @@ pub async fn build_app(database_url: &str, jwt_secret: String) -> Router {
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .layer(DefaultBodyLimit::max(5 * 1024 * 1024))
         .layer(tower_http::trace::TraceLayer::new_for_http())
+        //Handle cors
+        .layer(
+            CorsLayer::new()
+                .allow_origin(Any)
+                .allow_methods(Any)
+                .allow_headers(Any),
+        )
 }
